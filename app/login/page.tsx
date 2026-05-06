@@ -8,6 +8,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getUserProfile } from '@/lib/firestore';
 
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
