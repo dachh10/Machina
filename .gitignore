@@ -8,3 +8,4 @@ coverage/
 !.env.example
 .next/
 public/Fondo2.avif
+tsconfig.tsbuildinfo

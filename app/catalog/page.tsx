@@ -2,34 +2,47 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Search, ArrowRight, Zap, Loader2, Star, ShieldCheck } from 'lucide-react';
+import { Search, ArrowRight, Zap, Loader2, Star, ShieldCheck, Filter, XCircle, MapPin } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { getProducts, getCategories } from '@/lib/firestore';
 
 interface Producto {
   id: string;
   nombre: string;
   categoria: string;
-  precio: number;
+  precio: number | string;
   imagen: string;
   tag: string | null;
   status: string;
   descripcion?: string;
   marca?: string;
   modelo?: string;
+  disponibilidad?: string;
+  ubicacion?: string;
+  ubicaciones?: string[];
+  tipoNegocio?: 'renta' | 'venta' | 'ambos';
 }
 
 interface Category {
   id: string;
   nombre: string;
   slug: string;
+  ubicacion?: string;
+  ubicaciones?: string[];
 }
 
 export default function Catalog() {
+  const searchParams = useSearchParams();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoria, setCategoria] = useState("Todas");
-  const [busqueda, setBusqueda] = useState("");
+  
+  // Initialize states from URL params if present
+  const [categoria, setCategoria] = useState(searchParams.get('categoria') || "Todas");
+  const [busqueda, setBusqueda] = useState(searchParams.get('q') || "");
+  const [ubicacion, setUbicacion] = useState(searchParams.get('ubicacion') || "México");
+  
+  const [orden, setOrden] = useState("recientes");
   const [visibleProducts, setVisibleProducts] = useState<number[]>([]);
   const [visibleTrust, setVisibleTrust] = useState(false);
   const productRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -41,7 +54,7 @@ export default function Catalog() {
 
   useEffect(() => {
     cargarProductos();
-  }, [categoria]);
+  }, []); // Fetch all products once
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -93,18 +106,46 @@ export default function Catalog() {
     setLoading(true);
     setVisibleProducts([]);
     try {
-      const data = await getProducts(categoria === "Todas" ? undefined : categoria);
-      setProductos(data);
+      const data = await getProducts(); // Fetch all
+      setProductos(data as Producto[]);
     } catch (error) {
       console.error("Error cargando productos:", error);
     }
     setLoading(false);
   };
 
-  const productosFiltrados = productos.filter(p => 
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.categoria.toLowerCase().includes(busqueda.toLowerCase())
+  const locations = ['México', 'CDMX', 'Monterrey', 'Guadalajara', 'Querétaro'];
+
+  const categoriasFiltradas = categorias.filter(cat => 
+    ubicacion === "México" || (cat.ubicaciones && cat.ubicaciones.includes(ubicacion))
   );
+
+  let productosMostrados = productos.filter(p => {
+    const coincideBusqueda = 
+      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.categoria.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (p.marca && p.marca.toLowerCase().includes(busqueda.toLowerCase()));
+    
+    const coincideUbicacion = 
+      ubicacion === "México" || 
+      (p.ubicaciones && p.ubicaciones.includes(ubicacion));
+      
+    const coincideCategoria = 
+      categoria === "Todas" || 
+      p.categoria === categoria;
+      
+    return coincideBusqueda && coincideUbicacion && coincideCategoria;
+  });
+
+  productosMostrados.sort((a, b) => {
+    const precioA = typeof a.precio === 'string' ? parseFloat(a.precio.replace(/[^0-9.-]+/g,"")) : Number(a.precio) || 0;
+    const precioB = typeof b.precio === 'string' ? parseFloat(b.precio.replace(/[^0-9.-]+/g,"")) : Number(b.precio) || 0;
+    
+    if (orden === "precio_asc") return precioA - precioB;
+    if (orden === "precio_desc") return precioB - precioA;
+    if (orden === "alfabetico") return a.nombre.localeCompare(b.nombre);
+    return 0;
+  });
 
   const categoryOptions = categorias.length > 0 
     ? ["Todas", ...categorias.map(c => c.nombre)]
@@ -148,30 +189,85 @@ export default function Catalog() {
       <section className="relative pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Search & Filter Bar */}
         <div className="sticky top-24 z-30 mb-12">
-          <div className="bg-dark-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full md:w-96 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary transition-colors w-5 h-5" />
-              <input 
-                type="text" 
-                placeholder="Buscar por nombre, modelo o ID..." 
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full bg-dark-950 border border-dark-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none transition-all placeholder:text-dark-600"
-              />
-            </div>
+          <div className="bg-dark-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col gap-4">
             
-            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-              {categoryOptions.map((cat) => (
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full md:w-96 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary transition-colors w-5 h-5" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar por nombre, marca o modelo..." 
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="w-full bg-dark-950 border border-dark-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary focus:outline-none transition-all placeholder:text-dark-600"
+                />
+              </div>
+              
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="flex items-center gap-2 bg-dark-950 border border-dark-700 rounded-xl px-4 py-3 shrink-0">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  <select 
+                    value={orden} 
+                    onChange={(e) => setOrden(e.target.value)}
+                    className="bg-transparent text-sm text-gray-300 font-medium focus:outline-none cursor-pointer appearance-none outline-none"
+                  >
+                    <option value="recientes" className="bg-dark-900 text-white">Más Recientes</option>
+                    <option value="precio_asc" className="bg-dark-900 text-white">Precio: Menor a Mayor</option>
+                    <option value="precio_desc" className="bg-dark-900 text-white">Precio: Mayor a Menor</option>
+                    <option value="alfabetico" className="bg-dark-900 text-white">Orden Alfabético</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Locations */}
+            <div className="flex gap-2 overflow-x-auto w-full pb-2 border-b border-white/5">
+              <div className="flex items-center gap-2 px-2 border-r border-white/5 mr-2">
+                <MapPin className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Ciudad</span>
+              </div>
+              {locations.map((loc) => (
                 <button
-                  key={cat}
-                  onClick={() => setCategoria(cat)}
+                  key={loc}
+                  onClick={() => setUbicacion(loc)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all border ${
+                    ubicacion === loc 
+                      ? "bg-primary text-dark-950 border-primary" 
+                      : "bg-dark-950 text-gray-400 border-dark-700 hover:border-gray-500"
+                  }`}
+                >
+                  {loc}
+                </button>
+              ))}
+            </div>
+
+            {/* Categories */}
+            <div className="flex gap-2 overflow-x-auto w-full pb-2 md:pb-0 pt-2">
+              <div className="flex items-center gap-2 px-2 border-r border-white/5 mr-2">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Tipo</span>
+              </div>
+              <button
+                onClick={() => setCategoria("Todas")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${
+                  categoria === "Todas" 
+                    ? "bg-primary text-dark-950 border-primary shadow-[0_0_15px_rgba(255,193,7,0.3)]" 
+                    : "bg-dark-950 text-gray-400 border-dark-700 hover:border-gray-500 hover:text-white"
+                }`}
+              >
+                Todas
+              </button>
+              {categoriasFiltradas.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategoria(cat.nombre)}
                   className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${
-                    categoria === cat 
+                    categoria === cat.nombre 
                       ? "bg-primary text-dark-950 border-primary shadow-[0_0_15px_rgba(255,193,7,0.3)]" 
                       : "bg-dark-950 text-gray-400 border-dark-700 hover:border-gray-500 hover:text-white"
                   }`}
                 >
-                  {cat}
+                  {cat.nombre}
                 </button>
               ))}
             </div>
@@ -182,16 +278,26 @@ export default function Catalog() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
           </div>
-        ) : productosFiltrados.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-400 text-xl">No se encontraron productos</p>
+        ) : productosMostrados.length === 0 ? (
+          <div className="text-center py-20 bg-dark-900/50 rounded-3xl border border-white/5 backdrop-blur-sm">
+            <div className="w-20 h-20 bg-dark-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="w-10 h-10 text-gray-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">No se encontraron resultados</h3>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">No hay equipos que coincidan con tu búsqueda en la categoría seleccionada.</p>
+            <button 
+              onClick={() => { setBusqueda(""); setCategoria("Todas"); setOrden("recientes"); }}
+              className="inline-flex items-center gap-2 bg-dark-800 hover:bg-dark-700 text-white border border-white/10 px-6 py-3 rounded-xl transition-colors"
+            >
+              <XCircle className="w-5 h-5" /> Limpiar Filtros
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {productosFiltrados.map((product, index) => (
+            {productosMostrados.map((product, index) => (
               <Link key={product.id} href={`/catalog/${product.id}`} className="group block h-full">
                 <div 
-                  ref={(el) => (productRefs.current[index] = el)}
+                  ref={(el) => { productRefs.current[index] = el; }}
                   data-index={index}
                   className={`bg-dark-900 rounded-2xl border border-white/5 overflow-hidden hover:border-primary/50 transition-all duration-300 h-full flex flex-col hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1 relative ${
                     visibleProducts.includes(index) 
@@ -212,6 +318,17 @@ export default function Catalog() {
                       {product.tag && (
                         <span className="bg-primary text-dark-950 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
                           {product.tag}
+                        </span>
+                      )}
+                      <span className="bg-dark-900/80 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-white/10 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-primary" />
+                        {product.ubicaciones && product.ubicaciones.length > 1 
+                          ? `${product.ubicaciones.length} Ciudades` 
+                          : product.ubicaciones?.[0] || product.ubicacion || 'México'}
+                      </span>
+                      {product.tipoNegocio && (
+                        <span className="bg-blue-500/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-blue-400/30 flex items-center gap-1">
+                          {product.tipoNegocio === 'renta' ? 'Renta' : product.tipoNegocio === 'venta' ? 'Venta' : 'Renta/Venta'}
                         </span>
                       )}
                     </div>

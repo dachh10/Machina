@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Edit2, Trash2, Loader2, AlertCircle, Image, GripVertical } from 'lucide-react';
-import { getCategories, createCategory, updateCategory, deleteCategory } from '@/lib/firestore';
+import { Plus, Search, Edit2, Trash2, Loader2, AlertCircle, Image as ImageIcon, GripVertical, FolderKanban, Star } from 'lucide-react';
+import { getCategories, deleteCategory } from '@/lib/firestore';
 
 interface Category {
   id: string;
@@ -12,24 +12,13 @@ interface Category {
   descripcion?: string;
   imagenDestacada?: string;
   destacada?: boolean;
+  ubicaciones?: string[];
 }
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [modal, setModal] = useState<{ show: boolean; category: Category | null; mode: 'create' | 'edit' }>({
-    show: false,
-    category: null,
-    mode: 'create'
-  });
-  const [formData, setFormData] = useState({
-    nombre: '',
-    slug: '',
-    descripcion: '',
-    imagenDestacada: '',
-    destacada: false
-  });
   const [saving, setSaving] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; category: Category | null }>({ show: false, category: null });
 
@@ -45,39 +34,6 @@ export default function AdminCategories() {
       console.error('Error loading categories:', error);
     }
     setLoading(false);
-  }
-
-  function openCreateModal() {
-    setFormData({ nombre: '', slug: '', descripcion: '', imagenDestacada: '', destacada: false });
-    setModal({ show: true, category: null, mode: 'create' });
-  }
-
-  function openEditModal(category: Category) {
-    setFormData({
-      nombre: category.nombre,
-      slug: category.slug,
-      descripcion: category.descripcion || '',
-      imagenDestacada: category.imagenDestacada || '',
-      destacada: category.destacada || false
-    });
-    setModal({ show: true, category, mode: 'edit' });
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      if (modal.mode === 'create') {
-        await createCategory(formData);
-      } else if (modal.category) {
-        await updateCategory(modal.category.id, formData);
-      }
-      await loadCategories();
-      setModal({ show: false, category: null, mode: 'create' });
-    } catch (error) {
-      console.error('Error saving category:', error);
-    }
-    setSaving(false);
   }
 
   async function handleDelete() {
@@ -101,108 +57,104 @@ export default function AdminCategories() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-[#FFC107] animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="relative h-[35vh] min-h-[300px] rounded-2xl overflow-hidden">
-        <img 
-          src="/PageCategorias.avif" 
-          alt="Categorías" 
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/80 via-[#0a0a0a]/50 to-[#0a0a0a]/40" />
-        
-        <div className="relative z-10 flex flex-col justify-center items-center h-full max-w-4xl mx-auto px-4 w-full text-center">
-          <div className="inline-block bg-[#FFC107]/10 border border-[#FFC107]/20 rounded-full px-4 py-1 mb-6 backdrop-blur-sm">
-            <span className="text-[#FFC107] font-bold text-xs tracking-wide uppercase">Categorías</span>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter uppercase">
-            GESTION DE <span className="text-[#FFC107]">CATEGORIAS</span>
-          </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            Administra las categorías de tu catálogo. Controla qué categorías aparecen y sus imágenes destacadas.
-          </p>
-        </div>
-      </div>
-
+    <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-2">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Lista de Categorías</h1>
-          <p className="text-gray-500 mt-1">Gestiona las categorías de tu inventario</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider mb-4">
+            <FolderKanban className="w-4 h-4" /> Categorías
+          </div>
+          <h1 className="text-4xl font-black text-white tracking-tight">Gestión de Categorías</h1>
+          <p className="text-gray-400 mt-2 text-lg">Administra las categorías de tu catálogo y sus imágenes destacadas.</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 bg-[#FFC107] text-[#0a0a0a] px-5 py-3 rounded-lg font-bold hover:bg-[#FFB300] transition-all"
+        <Link
+          href="/admin/categorias/nueva"
+          className="group inline-flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 px-6 py-3 rounded-xl font-bold uppercase tracking-wider hover:bg-primary hover:text-[#0a0a0a] transition-all shadow-lg hover:shadow-primary/20 text-sm"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
           Nueva Categoría
-        </button>
+        </Link>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Buscar categorías..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-[#0F1012] border border-[#1a1a1a] text-white pl-12 pr-4 py-3 rounded-lg focus:outline-none focus:border-[#FFC107] transition-all placeholder:text-gray-600"
-        />
+      {/* Control Panel */}
+      <div className="bg-[#151618] border border-[#1a1a1a] rounded-2xl p-4 flex flex-col md:flex-row gap-4 shadow-sm">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre o descripción..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#0F1012] border border-[#222] text-white pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:border-primary/50 transition-all placeholder:text-gray-600"
+          />
+        </div>
       </div>
 
       {filteredCategories.length === 0 ? (
-        <div className="bg-[#0F1012] border border-[#1a1a1a] rounded-xl p-12 text-center">
-          <div className="w-12 h-12 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-4">
-            <GripVertical className="w-6 h-6 text-gray-600" />
+        <div className="bg-[#0F1012] border border-[#1a1a1a] rounded-2xl p-16 text-center">
+          <div className="w-16 h-16 bg-[#151618] border border-[#222] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <GripVertical className="w-8 h-8 text-gray-600" />
           </div>
-          <p className="text-gray-500">No se encontraron categorías</p>
-          <p className="text-gray-600 text-sm mt-2">Crea tu primera categoría para comenzar</p>
+          <h3 className="text-xl font-bold text-white mb-2">No se encontraron categorías</h3>
+          <p className="text-gray-500">Intenta con otros términos de búsqueda o crea una nueva.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCategories.map((category) => (
             <div
               key={category.id}
-              className="bg-[#0F1012] border border-[#1a1a1a] rounded-xl overflow-hidden hover:border-[#FFC107]/30 transition-all group"
+              className="bg-[#0F1012] border border-[#1a1a1a] rounded-2xl overflow-hidden hover:border-primary/30 transition-all group shadow-lg"
             >
-              <div className="aspect-video bg-[#151515] relative overflow-hidden">
+              <div className="aspect-video bg-[#0a0a0a] relative overflow-hidden">
                 {category.imagenDestacada ? (
-                  <img 
-                    src={category.imagenDestacada} 
+                  <img
+                    src={category.imagenDestacada}
                     alt={category.nombre}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Image className="w-8 h-8 text-gray-700" />
+                    <ImageIcon className="w-8 h-8 text-gray-700" />
                   </div>
                 )}
-                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => openEditModal(category)}
-                    className="p-2 bg-[#0a0a0a]/80 text-white rounded-lg hover:bg-[#FFC107] hover:text-[#0a0a0a] transition-colors"
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                {category.destacada && (
+                  <div className="absolute top-3 left-3 bg-[#FFC107] text-[#0a0a0a] px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                    <Star className="w-3 h-3 fill-current" />
+                    Destacada
+                  </div>
+                )}
+
+                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0">
+                  <Link
+                    href={`/admin/categorias/${category.id}`}
+                    className="p-2.5 bg-black/80 backdrop-blur-sm text-white rounded-lg hover:bg-primary hover:text-black transition-all shadow-lg hover:scale-110"
+                    title="Editar"
                   >
                     <Edit2 className="w-4 h-4" />
-                  </button>
+                  </Link>
                   <button
                     onClick={() => setDeleteModal({ show: true, category })}
-                    className="p-2 bg-[#0a0a0a]/80 text-white rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                    className="p-2.5 bg-black/80 backdrop-blur-sm text-white rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-lg hover:scale-110"
+                    title="Eliminar"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <div className="p-4">
-                <h3 className="text-white font-bold text-lg">{category.nombre}</h3>
-                <p className="text-gray-500 text-sm mt-1">{category.descripcion || 'Sin descripción'}</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs text-gray-600 font-mono">{category.slug}</span>
+              <div className="p-5">
+                <h3 className="text-white font-bold text-xl group-hover:text-primary transition-colors">{category.nombre}</h3>
+                <p className="text-gray-500 text-sm mt-2 line-clamp-2">{category.descripcion || 'Sin descripción'}</p>
+                <div className="mt-4 pt-4 border-t border-[#1a1a1a] flex items-center justify-between">
+                  <span className="text-xs text-gray-600 font-mono bg-[#151618] px-2 py-1 rounded-md">/{category.slug}</span>
                 </div>
               </div>
             </div>
@@ -210,123 +162,38 @@ export default function AdminCategories() {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
-      {modal.show && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1012] border border-[#1a1a1a] rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-xl mb-6">
-              {modal.mode === 'create' ? 'Nueva Categoría' : 'Editar Categoría'}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Nombre</label>
-                <input
-                  type="text"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-                  required
-                  className="w-full bg-[#151515] border border-[#1a1a1a] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFC107] transition-all"
-                  placeholder="Ej: Excavadoras"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Slug (URL)</label>
-                <input
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  required
-                  className="w-full bg-[#151515] border border-[#1a1a1a] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFC107] transition-all"
-                  placeholder="ej: excavadoras"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Descripción</label>
-                <textarea
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  rows={3}
-                  className="w-full bg-[#151515] border border-[#1a1a1a] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFC107] transition-all resize-none"
-                  placeholder="Descripción opcional de la categoría"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 text-sm mb-2">Imagen Destacada (URL)</label>
-                <input
-                  type="text"
-                  value={formData.imagenDestacada}
-                  onChange={(e) => setFormData({ ...formData, imagenDestacada: e.target.value })}
-                  className="w-full bg-[#151515] border border-[#1a1a1a] text-white px-4 py-3 rounded-lg focus:outline-none focus:border-[#FFC107] transition-all"
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                />
-                {formData.imagenDestacada && (
-                  <div className="mt-3 aspect-video bg-[#151515] rounded-lg overflow-hidden">
-                    <img src={formData.imagenDestacada} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="destacada"
-                  checked={formData.destacada}
-                  onChange={(e) => setFormData({ ...formData, destacada: e.target.checked })}
-                  className="w-5 h-5 rounded border-[#333] bg-[#151515] text-[#FFC107] focus:ring-[#FFC107] focus:ring-offset-0"
-                />
-                <label htmlFor="destacada" className="text-gray-400 text-sm">
-                  Mostrar en página de inicio (Categorías Destacadas)
-                </label>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setModal({ show: false, category: null, mode: 'create' })}
-                  className="flex-1 px-4 py-3 rounded-lg border border-[#333] text-gray-400 hover:bg-[#1a1a1a] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-3 rounded-lg bg-[#FFC107] text-[#0a0a0a] font-bold hover:bg-[#FFB300] transition-colors disabled:opacity-50"
-                >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : modal.mode === 'create' ? 'Crear' : 'Guardar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Delete Modal */}
       {deleteModal.show && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1012] border border-[#1a1a1a] rounded-xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+          <div className="bg-[#0F1012] border border-[#1a1a1a] rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center shrink-0">
                 <AlertCircle className="w-6 h-6 text-red-500" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-lg">Eliminar Categoría</h3>
-                <p className="text-gray-500 text-sm">Esta acción no se puede deshacer</p>
+                <h3 className="text-white font-bold text-lg tracking-tight">Eliminar Categoría</h3>
+                <p className="text-gray-500 text-sm">Esta acción no se puede deshacer.</p>
               </div>
             </div>
-            <p className="text-gray-400 mb-6">
-              ¿Estás seguro de que deseas eliminar <span className="text-white font-medium">{deleteModal.category?.nombre}</span>?
-            </p>
+
+            <div className="bg-[#151618] rounded-xl p-4 mb-6 border border-[#222]">
+              <p className="text-gray-400 text-sm mb-1">Se eliminará la siguiente categoría:</p>
+              <p className="text-white font-bold">{deleteModal.category?.nombre}</p>
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteModal({ show: false, category: null })}
-                className="flex-1 px-4 py-3 rounded-lg border border-[#333] text-gray-400 hover:bg-[#1a1a1a] transition-colors"
+                className="flex-1 px-4 py-3 rounded-xl border border-[#333] text-gray-400 font-medium hover:bg-[#1a1a1a] hover:text-white transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDelete}
                 disabled={saving}
-                className="flex-1 px-4 py-3 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/20 transition-all disabled:opacity-50 flex justify-center items-center"
               >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Eliminar'}
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Eliminación'}
               </button>
             </div>
           </div>

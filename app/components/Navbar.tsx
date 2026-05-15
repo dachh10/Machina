@@ -1,18 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X, Search, Hammer, LogOut } from 'lucide-react';
+import { Menu, X, Search, Hammer, LogOut, User, ChevronDown, LayoutDashboard, Monitor } from 'lucide-react';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
-function cn(...classes: string[]) {
+function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(' ');
 }
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -24,6 +27,17 @@ export function Navbar() {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Handle clicking outside of profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const getUserData = () => {
@@ -103,22 +117,51 @@ export function Navbar() {
           {/* Icons */}
           <div className="hidden md:flex items-center gap-3">
             {!loading && userData ? (
-              <div className="flex items-center gap-3">
-                {userData.isAdmin && (
-                  <Link 
-                    href="/admin" 
-                    className="text-primary font-medium text-sm px-3 py-2 hover:bg-white/5 rounded-sm"
-                  >
-                    Panel Admin
-                  </Link>
-                )}
-                <span className="text-gray-400 text-sm">{userData.nombre || 'Usuario'}</span>
-                <button
-                  onClick={handleLogout}
-                  className="text-gray-400 hover:text-white p-2 hover:bg-white/5 rounded-full"
+              <div className="relative" ref={profileRef}>
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="flex items-center gap-3 text-gray-300 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <div className="w-8 h-8 rounded-full bg-dark-950 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-primary/50 transition-colors">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-bold tracking-wide">{userData.nombre || 'Usuario'}</span>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform duration-300 text-gray-500", isProfileOpen && "rotate-180 text-white")} />
                 </button>
+
+                {/* Dropdown */}
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-dark-900 border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] py-2 z-50 overflow-hidden animate-fade-in-up origin-top-right backdrop-blur-xl">
+                    <div className="px-4 py-2 border-b border-white/5 mb-2">
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Cuenta</p>
+                      <p className="text-sm text-white truncate">{userData.email || 'Admin'}</p>
+                    </div>
+
+                    {userData.isAdmin && (
+                      <Link 
+                        href={pathname.startsWith('/admin') ? "/" : "/admin"}
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-primary hover:bg-white/5 transition-colors"
+                      >
+                        {pathname.startsWith('/admin') ? (
+                          <><Monitor className="w-4 h-4" /> Vista Cliente</>
+                        ) : (
+                          <><LayoutDashboard className="w-4 h-4" /> Panel Administrador</>
+                        )}
+                      </Link>
+                    )}
+                    
+                    <button
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors text-left"
+                    >
+                      <LogOut className="w-4 h-4" /> Cerrar Sesión
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -198,16 +241,27 @@ export function Navbar() {
             <div className="border-t border-white/10 mt-4 pt-4 pb-2 space-y-2">
               {!loading && userData ? (
                 <>
-                  <div className="px-3 py-2 text-gray-400 text-sm">
-                    {userData.nombre || 'Usuario'}
+                  <div className="px-3 py-3 flex items-center gap-3 border-b border-white/5 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-dark-950 border border-white/10 flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-white font-bold">{userData.nombre || 'Usuario'}</div>
+                      <div className="text-gray-500 text-xs">{userData.email || 'Admin'}</div>
+                    </div>
                   </div>
+
                   {userData.isAdmin && (
                     <Link
-                      href="/admin"
+                      href={pathname.startsWith('/admin') ? "/" : "/admin"}
                       onClick={() => setIsOpen(false)}
-                      className="block px-3 py-3 rounded-md text-base font-medium text-primary hover:bg-white/5"
+                      className="flex items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-primary hover:bg-white/5"
                     >
-                      Panel Admin
+                      {pathname.startsWith('/admin') ? (
+                        <><Monitor className="w-5 h-5" /> Vista Cliente</>
+                      ) : (
+                        <><LayoutDashboard className="w-5 h-5" /> Panel Administrador</>
+                      )}
                     </Link>
                   )}
                   <button
@@ -215,9 +269,9 @@ export function Navbar() {
                       setIsOpen(false);
                       handleLogout();
                     }}
-                    className="block w-full text-left px-3 py-3 rounded-md text-base font-medium text-gray-300 hover:bg-white/5"
+                    className="flex w-full items-center gap-3 px-3 py-3 rounded-md text-base font-medium text-red-400 hover:bg-red-500/10 text-left"
                   >
-                    Cerrar Sesión
+                    <LogOut className="w-5 h-5" /> Cerrar Sesión
                   </button>
                 </>
               ) : pathname === '/login' ? (

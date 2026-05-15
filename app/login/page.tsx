@@ -49,7 +49,7 @@ export default function Login() {
         return;
       }
       
-      let userProfile = await getUserProfile(userCredential.user.uid);
+      let userProfile = await getUserProfile(userCredential.user.uid) as any;
       
       // Si no existe perfil, crearlo
       if (!userProfile) {

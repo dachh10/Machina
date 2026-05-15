@@ -1,5 +1,4 @@
 import { db } from './firebase';
-import { storage } from './firebase';
 import { 
   collection, 
   addDoc, 
@@ -13,10 +12,11 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
+  Query,
   DocumentData,
   CollectionReference
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 
 // Tipos
 export interface UserProfile {
@@ -39,6 +39,8 @@ export interface Product {
   marca?: string;
   modelo?: string;
   disponibilidad?: string;
+  ubicaciones: string[];
+  tipoNegocio?: 'renta' | 'venta' | 'ambos';
   createdAt?: any;
 }
 
@@ -49,7 +51,61 @@ export interface Category {
   descripcion?: string;
   imagenDestacada?: string;
   destacada?: boolean;
+  ubicaciones: string[];
   createdAt?: any;
+}
+
+export interface SucursalData {
+  nombre: string;
+  telefono: string;
+  whatsapp: string;
+  email: string;
+  facebook: string;
+  direccion: string;
+  mapQuery: string;
+}
+
+export const DEFAULT_SUCURSALES: Record<string, SucursalData> = {
+  cdmx: {
+    nombre: 'Ciudad de México',
+    telefono: '+52 55 1234 5678',
+    whatsapp: '525512345678',
+    email: 'cdmx@machina.mx',
+    facebook: 'https://m.me/MachinaOficial',
+    direccion: 'Tracsa Caterpillar Ciudad de México',
+    mapQuery: 'Tracsa Caterpillar Ciudad de Mexico',
+  },
+  monterrey: {
+    nombre: 'Monterrey',
+    telefono: '+52 81 1234 5678',
+    whatsapp: '528112345678',
+    email: 'mty@machina.mx',
+    facebook: 'https://m.me/MachinaOficial',
+    direccion: 'Madisa Caterpillar Monterrey',
+    mapQuery: 'Madisa Caterpillar Monterrey',
+  },
+  guadalajara: {
+    nombre: 'Guadalajara',
+    telefono: '+52 33 1234 5678',
+    whatsapp: '523312345678',
+    email: 'gdl@machina.mx',
+    facebook: 'https://m.me/MachinaOficial',
+    direccion: 'Tracsa Caterpillar Guadalajara',
+    mapQuery: 'Tracsa Caterpillar Guadalajara',
+  },
+  queretaro: {
+    nombre: 'Querétaro',
+    telefono: '+52 44 1234 5678',
+    whatsapp: '524412345678',
+    email: 'qro@machina.mx',
+    facebook: 'https://m.me/MachinaOficial',
+    direccion: 'Tracsa Caterpillar Querétaro',
+    mapQuery: 'Tracsa Caterpillar Queretaro',
+  },
+};
+
+export function getSucursalDefaults(): Record<string, SucursalData> {
+  return DEFAULT_SUCURSALES;
 }
 
 // Colecciones
@@ -64,7 +120,7 @@ export const COLLECTIONS = {
 
 // Productos
 export async function getProducts(category?: string) {
-  let q = collection(db, COLLECTIONS.PRODUCTS);
+  let q: Query<DocumentData> = collection(db, COLLECTIONS.PRODUCTS);
   
   if (category && category !== 'Todas') {
     q = query(q, where('categoria', '==', category));
@@ -90,6 +146,9 @@ export async function sendContactMessage(data: {
   email: string;
   telefono?: string;
   mensaje: string;
+  sucursal?: string;
+  canal?: string;
+  tipoServicio?: string;
 }) {
   const docRef = await addDoc(collection(db, COLLECTIONS.CONTACT_MESSAGES), {
     ...data,
@@ -148,11 +207,15 @@ export async function createProduct(data: {
   marca?: string;
   modelo?: string;
   disponibilidad?: string;
+  ubicaciones?: string[];
+  tipoNegocio?: 'renta' | 'venta' | 'ambos';
 }) {
   const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), {
     ...data,
     createdAt: serverTimestamp(),
     disponibilidad: data.disponibilidad || 'disponible',
+    ubicaciones: data.ubicaciones && data.ubicaciones.length > 0 ? data.ubicaciones : ['CDMX', 'Monterrey', 'Guadalajara', 'Querétaro'],
+    tipoNegocio: data.tipoNegocio || 'renta',
   });
   return docRef.id;
 }
@@ -166,6 +229,8 @@ export async function updateProduct(id: string, data: {
   marca?: string;
   modelo?: string;
   disponibilidad?: string;
+  ubicaciones?: string[];
+  tipoNegocio?: 'renta' | 'venta' | 'ambos';
 }) {
   const docRef = doc(db, COLLECTIONS.PRODUCTS, id);
   await updateDoc(docRef, {
@@ -179,17 +244,7 @@ export async function deleteProduct(id: string) {
   await deleteDoc(docRef);
 }
 
-// Subir imagen a Firebase Storage
-export async function uploadProductImage(file: File): Promise<string> {
-  const timestamp = Date.now();
-  const fileName = `${timestamp}_${file.name.replace(/\s/g, '_')}`;
-  const storageRef = ref(storage, `productos/${fileName}`);
-  
-  await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(storageRef);
-  
-  return downloadURL;
-}
+
 
 // Usuarios
 export async function createUserProfile(userId: string, data: {
@@ -251,32 +306,35 @@ export async function deleteUser(userId: string) {
 export async function getConfig() {
   const snapshot = await getDocs(collection(db, COLLECTIONS.CONFIG));
   if (snapshot.empty) return null;
+  // Si hay varios (por error), devolvemos el primero pero el update los limpiará
   return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
 }
 
 export async function updateConfig(data: {
   nombreEmpresa?: string;
-  telefono?: string;
-  email?: string;
-  direccion?: string;
-  facebook?: string;
   instagram?: string;
-  linkedin?: string;
   horario?: string;
-  mensajeBienvenida?: string;
+  sucursales?: Record<string, SucursalData>;
 }) {
   const snapshot = await getDocs(collection(db, COLLECTIONS.CONFIG));
+  
   if (snapshot.empty) {
     await addDoc(collection(db, COLLECTIONS.CONFIG), {
       ...data,
       updatedAt: serverTimestamp(),
     });
   } else {
-    const configDoc = snapshot.docs[0];
-    await updateDoc(doc(db, COLLECTIONS.CONFIG, configDoc.id), {
+    // Actualizar el primero y borrar los demás para mantener una sola fuente de verdad
+    const [first, ...others] = snapshot.docs;
+    await updateDoc(doc(db, COLLECTIONS.CONFIG, first.id), {
       ...data,
       updatedAt: serverTimestamp(),
     });
+
+    // Limpieza de duplicados si los hay
+    for (const extraDoc of others) {
+      await deleteDoc(doc(db, COLLECTIONS.CONFIG, extraDoc.id));
+    }
   }
 }
 
@@ -303,9 +361,11 @@ export async function createCategory(data: {
   descripcion?: string;
   imagenDestacada?: string;
   destacada?: boolean;
+  ubicaciones?: string[];
 }) {
   const docRef = await addDoc(collection(db, COLLECTIONS.CATEGORIES), {
     ...data,
+    ubicaciones: data.ubicaciones && data.ubicaciones.length > 0 ? data.ubicaciones : ['CDMX', 'Monterrey', 'Guadalajara', 'Querétaro'],
     createdAt: serverTimestamp(),
   });
   return docRef.id;
@@ -317,6 +377,7 @@ export async function updateCategory(id: string, data: {
   descripcion?: string;
   imagenDestacada?: string;
   destacada?: boolean;
+  ubicaciones?: string[];
 }) {
   const docRef = doc(db, COLLECTIONS.CATEGORIES, id);
   await updateDoc(docRef, {

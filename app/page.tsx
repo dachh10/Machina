@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Search, Shield, Clock, MapPin, Zap, ChevronRight, Zap as ZapIcon, Loader2 } from 'lucide-react';
+import { ArrowRight, Search, Shield, Clock, MapPin, Zap, ChevronRight, Zap as ZapIcon, Loader2, Calculator, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import ProjectCalculator from './components/ProjectCalculator';
 import { getProducts, getCategories } from '@/lib/firestore';
 
 interface Producto {
@@ -13,6 +15,8 @@ interface Producto {
   imagen: string;
   tag: string | null;
   status: string;
+  tipoNegocio?: 'renta' | 'venta' | 'ambos';
+  ubicaciones?: string[];
 }
 
 interface Category {
@@ -25,9 +29,20 @@ interface Category {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [products, setProducts] = useState<Producto[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Search States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [selectedLocation, setSelectedLocation] = useState('México');
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [showLocationMenu, setShowLocationMenu] = useState(false);
+
+  const locations = ['México', 'CDMX', 'Monterrey', 'Guadalajara', 'Querétaro'];
 
   useEffect(() => {
     const loadData = async () => {
@@ -36,7 +51,8 @@ export default function Home() {
           getProducts(),
           getCategories()
         ]);
-        setProducts(productsData.slice(0, 4));
+        setTotalProducts(productsData.length);
+        setProducts(productsData.slice(0, 4) as any[]);
         setCategories(categoriesData as Category[]);
       } catch (error) {
         console.error("Error:", error);
@@ -45,6 +61,16 @@ export default function Home() {
     };
     loadData();
   }, []);
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.append('q', searchQuery);
+    if (selectedCategory !== 'Todas') params.append('categoria', selectedCategory);
+    // Location is not yet fully implemented in catalog but we can send it
+    if (selectedLocation !== 'México') params.append('ubicacion', selectedLocation);
+    
+    router.push(`/catalog?${params.toString()}`);
+  };
   return (
     <div className="flex flex-col min-h-screen bg-dark-950">
       <section className="relative h-[90vh] flex items-center overflow-hidden">
@@ -99,29 +125,97 @@ export default function Home() {
       </section>
 
       <section className="relative z-20 -mt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        <div className="bg-dark-900 p-6 rounded-xl shadow-2xl border border-white/10 backdrop-blur-md">
+        <div className="bg-dark-900/80 p-6 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-            <div className="lg:col-span-6">
-              <div className="flex w-full flex-1 items-stretch rounded-lg h-12 overflow-hidden bg-dark-950 border border-dark-700 focus-within:border-primary transition-colors">
-                <div className="text-gray-400 flex items-center justify-center px-4">
+            {/* Input de Búsqueda */}
+            <div className="lg:col-span-5">
+              <div className="flex w-full flex-1 items-stretch rounded-xl h-14 overflow-hidden bg-dark-950 border border-white/5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+                <div className="text-gray-500 flex items-center justify-center px-4">
                   <Search className="w-5 h-5" />
                 </div>
                 <input 
-                  className="flex w-full border-none bg-transparent focus:ring-0 px-2 text-base font-medium text-white placeholder:text-gray-500 focus:outline-none" 
-                  placeholder="Que equipo necesitas hoy?"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="flex w-full border-none bg-transparent focus:ring-0 px-2 text-base font-bold text-white placeholder:text-gray-600 focus:outline-none" 
+                  placeholder="¿Qué equipo necesitas hoy?"
                 />
               </div>
             </div>
-            <div className="lg:col-span-4 flex gap-3 overflow-x-auto pb-1 lg:pb-0">
-              <button className="flex h-12 shrink-0 items-center justify-between gap-x-3 rounded-lg bg-dark-950 px-4 min-w-[160px] border border-dark-700 hover:border-primary transition-colors text-gray-300 hover:text-white">
-                <span className="text-sm font-bold">Tipo de Equipo</span>
-              </button>
-              <button className="flex h-12 shrink-0 items-center justify-between gap-x-3 rounded-lg bg-dark-950 px-4 min-w-[140px] border border-dark-700 hover:border-primary transition-colors text-gray-300 hover:text-white">
-                <span className="text-sm font-bold">Ubicacion</span>
-              </button>
+
+            {/* Dropdowns */}
+            <div className="lg:col-span-5 flex flex-col sm:flex-row gap-3">
+              {/* Categoría */}
+              <div className="relative flex-1">
+                <button 
+                  onClick={() => { setShowCategoryMenu(!showCategoryMenu); setShowLocationMenu(false); }}
+                  className="flex h-14 w-full items-center justify-between gap-x-3 rounded-xl bg-dark-950 px-4 border border-white/5 hover:border-primary/50 transition-all text-white group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-black uppercase tracking-tight">{selectedCategory === 'Todas' ? 'Tipo de Equipo' : selectedCategory}</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showCategoryMenu ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showCategoryMenu && (
+                  <div className="absolute top-full left-0 w-full mt-2 bg-dark-900 border border-white/10 rounded-xl shadow-2xl z-50 py-2 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                    <button 
+                      onClick={() => { setSelectedCategory('Todas'); setShowCategoryMenu(false); }}
+                      className="w-full text-left px-4 py-3 hover:bg-white/5 text-gray-400 hover:text-primary transition-colors text-sm font-bold uppercase"
+                    >
+                      Todas las Categorías
+                    </button>
+                    {categories.map(cat => (
+                      <button 
+                        key={cat.id}
+                        onClick={() => { setSelectedCategory(cat.nombre); setShowCategoryMenu(false); }}
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 text-gray-400 hover:text-primary transition-colors text-sm font-bold uppercase"
+                      >
+                        {cat.nombre}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Ubicación */}
+              <div className="relative flex-1">
+                <button 
+                  onClick={() => { setShowLocationMenu(!showLocationMenu); setShowCategoryMenu(false); }}
+                  className="flex h-14 w-full items-center justify-between gap-x-3 rounded-xl bg-dark-950 px-4 border border-white/5 hover:border-primary/50 transition-all text-white group"
+                >
+                  <div className="flex items-center gap-3">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-black uppercase tracking-tight">{selectedLocation}</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showLocationMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showLocationMenu && (
+                  <div className="absolute top-full left-0 w-full mt-2 bg-dark-900 border border-white/10 rounded-xl shadow-2xl z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    {locations.map(loc => (
+                      <button 
+                        key={loc}
+                        onClick={() => { setSelectedLocation(loc); setShowLocationMenu(false); }}
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 text-gray-400 hover:text-primary transition-colors text-sm font-bold uppercase"
+                      >
+                        {loc}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Botón Buscar */}
             <div className="lg:col-span-2">
-              <button className="w-full h-12 bg-primary text-dark-950 font-black rounded-lg uppercase tracking-wider hover:bg-primary-hover transition-colors shadow-lg">
+              <button 
+                onClick={handleSearch}
+                className="w-full h-14 bg-primary text-dark-950 font-black rounded-xl uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_20px_rgba(255,193,7,0.2)] hover:shadow-primary/40 flex items-center justify-center gap-2"
+              >
+                <Search className="w-5 h-5" />
                 BUSCAR
               </button>
             </div>
@@ -143,9 +237,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { number: "500+", label: "Equipos Disponibles", icon: Shield },
+              { number: `${totalProducts}`, label: "Equipos Disponibles", icon: Shield },
               { number: "24/7", label: "Soporte Técnico", icon: Clock },
-              { number: "32", label: "Estados Cubiertos", icon: MapPin },
+              { number: "4", label: "Ciudades Cubiertas", icon: MapPin },
               { number: "15+", label: "Años de Experiencia", icon: Zap },
             ].map((stat, idx) => (
               <div 
@@ -189,8 +283,8 @@ export default function Home() {
               : categories.slice(0, 3)
             ).map((cat, idx) => (
               <Link key={cat.id} href={`/catalog?categoria=${cat.nombre}`} className="group relative h-[500px] bg-dark-900 overflow-hidden cursor-pointer border border-dark-800 hover:border-primary/50 transition-colors">
-                <div 
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0"
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                   style={{ backgroundImage: cat.imagenDestacada ? `url("${cat.imagenDestacada}")` : undefined }}
                 />
                 {!cat.imagenDestacada && (
@@ -253,32 +347,27 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-24 bg-primary relative overflow-hidden">
-        <div className="absolute inset-0 bg-carbon opacity-20 mix-blend-multiply"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="max-w-2xl">
-            <h2 className="text-4xl md:text-5xl font-black text-dark-950 mb-6">PLANIFICANDO UNA OBRA?</h2>
-            <p className="text-dark-900 text-xl font-medium mb-8 leading-relaxed">
-              Utiliza nuestra calculadora de proyectos para estimar la maquinaria necesaria y obtener un presupuesto preliminar en segundos.
-            </p>
-            <Link href="/contact" className="bg-dark-950 text-white px-8 py-4 rounded-sm font-bold hover:bg-dark-900 transition-all shadow-xl flex items-center gap-2">
-              <ZapIcon className="w-5 h-5 text-primary" /> Calcular Ahora
-            </Link>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md p-8 rounded-sm border border-dark-950/10 rotate-3 transform hover:rotate-0 transition-transform duration-500">
-            <div className="text-dark-950 font-mono text-sm">
-              <div className="flex justify-between mb-2 border-b border-dark-950/20 pb-2">
-                <span>Duracion:</span>
-                <span className="font-bold">3 Meses</span>
+      <section className="py-12 bg-dark-900 border-y border-white/10 relative overflow-hidden">
+        {/* Elementos decorativos sutiles */}
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/10 to-transparent pointer-events-none"></div>
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 bg-dark-950/50 p-8 rounded-2xl border border-white/5 backdrop-blur-sm shadow-xl">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                <span className="text-primary font-mono text-xs uppercase tracking-widest">Herramienta Inteligente</span>
               </div>
-              <div className="flex justify-between mb-2 border-b border-dark-950/20 pb-2">
-                <span>Terreno:</span>
-                <span className="font-bold">Rocoso / 5000m2</span>
-              </div>
-              <div className="flex justify-between text-lg font-black mt-4">
-                <span>ESTIMADO:</span>
-                <span>$450,000 MXN</span>
-              </div>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">
+                ¿PLANIFICANDO UNA OBRA?
+              </h2>
+              <p className="text-gray-400 text-lg max-w-xl">
+                Cotiza en tiempo real la maquinaria que necesitas. Selecciona tus equipos, define las fechas y obtén tu presupuesto al instante.
+              </p>
+            </div>
+            <div className="shrink-0 w-full md:w-auto">
+              <ProjectCalculator />
             </div>
           </div>
         </div>

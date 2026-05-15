@@ -2,12 +2,31 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Target, Eye, ShieldCheck, MapPin, Wrench, Award } from 'lucide-react';
+import { getConfig, getProducts, DEFAULT_SUCURSALES, SucursalData } from '@/lib/firestore';
+
+const CIUDAD_KEYS = ['cdmx', 'monterrey', 'guadalajara', 'queretaro'] as const;
 
 export default function About() {
+  const [selectedCity, setSelectedCity] = useState(0);
   const [visibleCards, setVisibleCards] = useState<number[]>([]);
   const [visibleStats, setVisibleStats] = useState(false);
+  const [sucursales, setSucursales] = useState<Record<string, SucursalData>>(DEFAULT_SUCURSALES);
+  const [productCount, setProductCount] = useState(0);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
+
   const statsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    getConfig().then((config: any) => {
+      if (config?.sucursales) {
+        setSucursales({ ...DEFAULT_SUCURSALES, ...config.sucursales });
+      }
+    }).catch(() => {});
+
+    getProducts().then(products => {
+      setProductCount(products.length);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const cardsObserver = new IntersectionObserver(
@@ -101,7 +120,7 @@ export default function About() {
               }
             ].map((item, index) => (
               <div 
-                ref={(el) => (cardsRef.current[index] = el)}
+                ref={(el) => { cardsRef.current[index] = el; }}
                 data-index={index}
                 className={`bg-dark-900 border border-white/5 p-8 rounded-xl hover:border-primary/50 transition-all duration-500 group relative overflow-hidden ${
                   visibleCards.includes(index) 
@@ -139,7 +158,7 @@ export default function About() {
             <div className="flex-1 text-center md:text-left">
               <p className="text-primary font-mono text-sm uppercase tracking-widest mb-2">Trayectoria en el mercado</p>
               <h2 className="text-4xl md:text-6xl font-black text-white mb-4">
-                MAS DE <span className="text-primary">25 ANOS</span>
+                MÁS DE <span className="text-primary">25 AÑOS</span>
               </h2>
               <p className="text-xl text-gray-400 font-medium">De experiencia comprobada en la industria</p>
             </div>
@@ -147,7 +166,7 @@ export default function About() {
             <div className="flex gap-8 md:gap-16 border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-12">
               <div className={`text-center transition-all duration-500 ${visibleStats ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`} style={{ transitionDelay: '100ms' }}>
                 <div className="text-4xl md:text-5xl font-black text-white mb-2 flex items-center justify-center gap-1">
-                  +500
+                  +{productCount || '500'}
                   <Wrench className="w-6 h-6 text-primary opacity-50" />
                 </div>
                 <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Equipos Disponibles</p>
@@ -177,41 +196,54 @@ export default function About() {
             </p>
             
             <ul className="space-y-4">
-              {[
-                "Ciudad de Mexico (Matriz)",
-                "Monterrey, Nuevo Leon",
-                "Guadalajara, Jalisco",
-                "Queretaro, Qro."
-              ].map((loc, i) => (
-                <li key={i} className="flex items-center gap-4 text-white font-medium p-4 bg-dark-900 rounded-lg border border-white/5 hover:border-primary/30 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-primary" />
-                  </div>
-                  {loc}
-                </li>
-              ))}
+              {CIUDAD_KEYS.map((key, i) => {
+                const s = sucursales[key];
+                return (
+                  <li
+                    key={key}
+                    onClick={() => setSelectedCity(i)}
+                    className={`flex items-center gap-4 font-medium p-4 rounded-lg border transition-all cursor-pointer ${
+                      selectedCity === i
+                        ? 'bg-primary/10 border-primary text-white shadow-[0_0_15px_rgba(255,193,7,0.15)]'
+                        : 'bg-dark-900 border-white/5 text-gray-400 hover:border-primary/30 hover:text-gray-200'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                      selectedCity === i ? 'bg-primary text-dark-950' : 'bg-primary/10 text-primary'
+                    }`}>
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    {s.nombre}{i === 0 ? ' (Matriz)' : ''}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
-          <div className="relative h-[500px] bg-dark-900 rounded-2xl border border-white/10 overflow-hidden group">
-            <div className="absolute inset-0 opacity-40 group-hover:opacity-60 transition-opacity duration-700">
-              <img 
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=2674&auto=format&fit=crop" 
-                alt="Mapa" 
-                className="w-full h-full object-cover grayscale"
-              />
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-transparent to-transparent"></div>
-            
-            <div className="absolute inset-0 p-8 flex flex-col justify-end">
-              <div className="bg-primary text-dark-950 font-bold px-6 py-3 rounded-lg shadow-xl uppercase tracking-wider self-start transform -rotate-2 mb-4">
-                Cobertura Total
+            <div className="relative h-[500px] bg-dark-900 rounded-2xl border border-white/10 overflow-hidden group">
+              <div className="absolute inset-0">
+                <iframe
+                  key={selectedCity}
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                    CIUDAD_KEYS.map(k => sucursales[k].mapQuery)[selectedCity]
+                  )}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                  className="w-full h-full opacity-80 group-hover:opacity-100 transition-all duration-700"
+                  style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) brightness(85%) contrast(110%) grayscale(20%)' }}
+                  allowFullScreen={false}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
-              <p className="text-white text-sm max-w-xs bg-dark-950/80 backdrop-blur-md p-4 rounded-lg border border-white/10">
-                Llegamos a donde tu proyecto lo requiera. Logistica especializada para transporte de maquinaria pesada.
-              </p>
+              <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 p-8 flex flex-col justify-end pointer-events-none">
+                <div className="bg-primary text-dark-950 font-bold px-6 py-3 rounded-lg shadow-xl uppercase tracking-wider self-start transform -rotate-2 mb-4">
+                  Sede {sucursales[CIUDAD_KEYS[selectedCity]].nombre}
+                </div>
+                <p className="text-white text-sm max-w-xs bg-dark-950/80 backdrop-blur-md p-4 rounded-lg border border-white/10 shadow-2xl">
+                  {sucursales[CIUDAD_KEYS[selectedCity]].direccion}
+                </p>
+              </div>
             </div>
-          </div>
         </div>
       </section>
     </div>
