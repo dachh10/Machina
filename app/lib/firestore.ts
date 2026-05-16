@@ -262,12 +262,12 @@ export async function createUserProfile(userId: string, data: {
   }, { merge: true });
 }
 
-export async function getUserProfile(userId: string) {
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const usersRef = collection(db, COLLECTIONS.USERS) as CollectionReference<DocumentData>;
   const q = query(usersRef, where('userId', '==', userId));
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as UserProfile;
 }
 
 export async function updateUserProfile(userId: string, data: { nombre?: string; telefono?: string }) {

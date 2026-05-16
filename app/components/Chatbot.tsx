@@ -1,148 +1,98 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Loader2, Wrench, Truck, Calendar, Phone } from 'lucide-react';
-
-interface Message {
-  role: 'user' | 'model';
-  text: string;
-}
-
-const quickActions = [
-  { label: 'Ver catálogo', icon: Wrench, action: '/catalog' },
-  { label: 'Rentar maquinaria', icon: Calendar, action: '/catalog' },
-  { label: 'Contactar', icon: Phone, action: '/contact' },
-];
+import { useState, useEffect } from 'react';
+import { X, MessageCircle, MapPin, ExternalLink } from 'lucide-react';
+import { getConfig, DEFAULT_SUCURSALES, SucursalData } from '@/lib/firestore';
 
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: '¡Hola! Soy el asistente de Machina. ¿En qué puedo ayudarte hoy?' }
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [locations, setLocations] = useState<Record<string, SucursalData>>(DEFAULT_SUCURSALES);
+  const cityKeys = ['cdmx', 'monterrey', 'guadalajara', 'queretaro'];
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    getConfig().then((config: any) => {
+      if (config?.sucursales) {
+        setLocations({ ...DEFAULT_SUCURSALES, ...config.sucursales });
+      }
+    }).catch(() => {});
+  }, []);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
-    setLoading(true);
-
-    // Simulated response
-    setTimeout(() => {
-      const responses = [
-        'Para rentar maquinaria visita nuestro catálogo en /catalog. Tenemos excavadoras, retroexcavadoras, montacargas y más.',
-        'Puedes contactarnos en la página de contacto /contact o llamarnos directamente. ¡Estamos para ayudarte!',
-        'Contamos con más de 500 máquinas disponibles. ¿Te gustaría ver nuestro catálogo?',
-        'Tenemos financiamiento disponible para la compra de maquinaria. ¿Te interesa cotizar?',
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      setMessages(prev => [...prev, { role: 'model', text: randomResponse }]);
-      setLoading(false);
-    }, 1000);
+  const openWhatsApp = (whatsapp: string, city: string) => {
+    const cleanNumber = whatsapp.replace(/\D/g, '');
+    const message = encodeURIComponent(`Hola Machina ${city}, estoy navegando en su sitio web y me gustaría solicitar información.`);
+    window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank');
+    setIsOpen(false);
   };
-
-  const handleQuickAction = (action: string) => {
-    window.location.href = action;
-  };
-
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-[#FFC107] rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform z-40"
-      >
-        <MessageCircle className="w-7 h-7 text-[#0a0a0a]" />
-      </button>
-    );
-  }
 
   return (
-    <div className="fixed bottom-6 right-6 w-80 md:w-96 bg-[#0F1012] border border-[#1a1a1a] rounded-xl shadow-2xl z-40 overflow-hidden">
-      {/* Header */}
-      <div className="bg-[#FFC107] px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#0a0a0a] rounded-full flex items-center justify-center">
-            <Wrench className="w-4 h-4 text-[#FFC107] transform -rotate-12" />
-          </div>
-          <span className="text-[#0a0a0a] font-bold">Machina Bot</span>
-        </div>
-        <button onClick={() => setIsOpen(false)} className="text-[#0a0a0a] hover:opacity-70">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div className="h-80 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] px-4 py-2 rounded-lg text-sm ${
-                msg.role === 'user'
-                  ? 'bg-[#FFC107] text-[#0a0a0a]'
-                  : 'bg-[#1a1a1a] text-gray-300'
-              }`}
-            >
-              {msg.text}
+    <div className="fixed bottom-6 right-6 z-50">
+      {/* Tooltip/Menu */}
+      {isOpen && (
+        <div className="absolute bottom-20 right-0 w-72 bg-dark-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-[#25D366] p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-white font-bold text-sm">Ventas y Soporte</span>
             </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-[#1a1a1a] px-4 py-2 rounded-lg">
-              <Loader2 className="w-4 h-4 text-[#FFC107] animate-spin" />
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Actions */}
-      {messages.length <= 2 && (
-        <div className="px-4 pb-2 flex gap-2 flex-wrap">
-          {quickActions.map((action, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleQuickAction(action.action)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[#1a1a1a] rounded-full text-xs text-gray-400 hover:text-[#FFC107] transition-colors"
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="text-white/80 hover:text-white transition-colors"
             >
-              <action.icon className="w-3 h-3" />
-              {action.label}
+              <X className="w-5 h-5" />
             </button>
-          ))}
+          </div>
+          
+          <div className="p-4 space-y-2 bg-dark-900">
+            <p className="text-gray-400 text-[11px] uppercase tracking-widest font-bold mb-3 px-2">Selecciona tu sucursal</p>
+            {cityKeys.map((key) => (
+              <button
+                key={key}
+                onClick={() => openWhatsApp(locations[key].whatsapp, locations[key].nombre)}
+                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-dark-800 flex items-center justify-center group-hover:bg-[#25D366]/10 transition-colors">
+                    <MapPin className="w-4 h-4 text-gray-500 group-hover:text-[#25D366] transition-colors" />
+                  </div>
+                  <span className="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">
+                    {locations[key]?.nombre || key}
+                  </span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
+          </div>
+          
+          <div className="p-3 bg-dark-950/50 border-t border-white/5 text-center">
+            <p className="text-[10px] text-gray-500">Atención inmediata de Lunes a Sábado</p>
+          </div>
         </div>
       )}
 
-      {/* Input */}
-      <div className="p-4 border-t border-[#1a1a1a]">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Escribe un mensaje..."
-            className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-[#FFC107]"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-            className="p-2 bg-[#FFC107] rounded-lg text-[#0a0a0a] hover:bg-[#FFB300] disabled:opacity-50 transition-colors"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      {/* Main Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-500 hover:scale-110 relative ${
+          isOpen ? 'bg-dark-800 rotate-90' : 'bg-[#25D366] hover:shadow-[#25D366]/20'
+        }`}
+      >
+        {isOpen ? (
+          <X className="w-8 h-8 text-white" />
+        ) : (
+          <>
+            <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping-slow opacity-20"></span>
+            <svg 
+              viewBox="0 0 24 24" 
+              className="w-9 h-9 fill-white"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+            </svg>
+          </>
+        )}
+      </button>
     </div>
   );
 }

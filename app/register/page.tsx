@@ -308,7 +308,7 @@ export default function Register() {
                 className="mt-1 rounded border-[#333] bg-[#111] text-[#FFC107] focus:ring-[#FFC107]" 
               />
               <label className="cursor-pointer hover:text-white leading-tight">
-                Acepto los <Link href="#" className="text-[#FFC107] hover:underline">términos</Link> y <Link href="#" className="text-[#FFC107] hover:underline">privacidad</Link>.
+                Acepto los <Link href="/terms" className="text-[#FFC107] hover:underline">términos</Link> y <Link href="/privacy" className="text-[#FFC107] hover:underline">privacidad</Link>.
               </label>
             </div>
 

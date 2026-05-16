@@ -52,7 +52,7 @@ export default function Services() {
       icon: Truck,
       title: "Logística y Transporte",
       description: "Traslado seguro de maquinaria pesada y sobredimensionada a cualquier rincón de la república.",
-      fullDescription: "Mover fierros pesados requiere experiencia y legalidad. Contamos con nuestra propia flota de tractocamiones, plataformas, camas bajas (lowboys) y equipos modulares para carga sobredimensionada. Nos encargamos de todo el papeleo y abanderamiento.",
+      fullDescription: "El transporte de equipos de gran escala exige una logística precisa y un cumplimiento normativo total. Contamos con nuestra propia flota de tractocamiones, plataformas, camas bajas (lowboys) y equipos modulares para carga sobredimensionada. Nos encargamos de toda la gestión técnica y el abanderamiento para asegurar una entrega puntual y segura.",
       features: ["Permisos federales y estatales al día", "Seguro de carga de puerta a puerta", "Rastreo satelital", "Personal capacitado para maniobras de alto riesgo"],
       image: "/ImagenesServicio/LogisticaServicios.avif"
     },

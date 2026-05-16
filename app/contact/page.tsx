@@ -103,8 +103,8 @@ export default function Contact() {
         'venta': 'Compra de Equipo',
         'mantenimiento': 'Servicio Técnico',
         'refacciones': 'Refacciones',
-        'logistica': 'Otro',
-        'capacitacion': 'Otro'
+        'logistica': 'Logística y Transporte',
+        'capacitacion': 'Capacitación a Operadores'
       };
       
       const mappedValue = mapServicio[servicioParam.toLowerCase()] || 'Otro';
@@ -457,6 +457,8 @@ export default function Contact() {
                           <option value="Compra de Equipo">Compra de Equipo</option>
                           <option value="Servicio Técnico">Servicio Técnico</option>
                           <option value="Refacciones">Refacciones</option>
+                          <option value="Logística y Transporte">Logística y Transporte</option>
+                          <option value="Capacitación a Operadores">Capacitación a Operadores</option>
                           <option value="Otro">Otro</option>
                         </select>
                       </div>
